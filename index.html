@@ -227,7 +227,7 @@ textarea:focus{border-color:var(--pink);}
   text-align:center;font-size:13px;color:var(--pink-deep);font-weight:700;margin-top:6px;
 }
 
-/* 提交状态 */
+/* 状态提示（复制成功 / 复制失败 / 一般提示） */
 .status{
   display:none;margin-top:14px;padding:12px 16px;border-radius:16px;
   font-size:13.5px;font-weight:700;text-align:center;line-height:1.6;
@@ -237,13 +237,24 @@ textarea:focus{border-color:var(--pink);}
 .status.err{background:#FFE9EA;color:#D9534F;}
 .status.info{background:var(--sky-soft);color:#3D7BB5;}
 
-/* 加载小圆点 */
-.spinner{
-  display:inline-block;width:15px;height:15px;border-radius:50%;
-  border:2.5px solid rgba(255,255,255,.45);border-top-color:#fff;
-  animation:spin .7s linear infinite;vertical-align:-2px;margin-right:8px;
+/* 复制按钮：轻微呼吸动效 + 复制成功态 */
+.btn-copy{animation:btnPulse 1.8s ease-in-out infinite;}
+.btn-copy.copied{
+  background:linear-gradient(135deg,#A8E8CE,#87D9B7);
+  box-shadow:0 8px 18px rgba(135,217,183,.36);
+  animation:popOk .5s cubic-bezier(.34,1.56,.64,1) both;
 }
-@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes btnPulse{
+  0%,100%{box-shadow:0 8px 18px rgba(135,217,183,.36);}
+  50%{box-shadow:0 8px 26px rgba(135,217,183,.62);}
+}
+@keyframes popOk{from{transform:scale(.9);}60%{transform:scale(1.06);}to{transform:scale(1);}}
+
+/* 手动复制兜底框（自动复制失败时，长按全选） */
+.manual-box{display:none;margin-top:14px;}
+.manual-box.show{display:block;animation:fadeUp .3s ease both;}
+.manual-box .mb-tip{font-size:12.5px;color:var(--ink-soft);text-align:center;margin-bottom:8px;}
+.manual-box textarea{min-height:150px;font-size:13.5px;line-height:1.8;-webkit-user-select:text;user-select:text;}
 
 /* 庆祝小爱心 */
 .celebrate{text-align:center;margin:16px 0 4px;}
@@ -337,7 +348,7 @@ textarea:focus{border-color:var(--pink);}
       <p class="card-sub" id="s3text"></p>
       <div class="opt-list" id="foodList"></div>
       <div class="custom-field" id="foodCustomField">
-        <input type="text" id="foodCustomInput" placeholder="其实就吃个嘴子也可以的嘛。。。" autocomplete="off">
+        <input type="text" id="foodCustomInput" placeholder="就嘴了吧！" autocomplete="off">
       </div>
     </div>
     <div class="footer">
@@ -358,19 +369,23 @@ textarea:focus{border-color:var(--pink);}
     <div class="footer">
       <div class="btn-row">
         <button class="btn ghost" type="button" data-back="3" style="flex:0 0 96px;">上一步</button>
-        <button class="btn" type="button" id="doSubmit">提交给他一个惊喜</button>
+        <button class="btn" type="button" id="toStep5">下一步</button>
       </div>
     </div>
   </section>
 
-  <!-- ========== 步骤 5：结果确认 ========== -->
+  <!-- ========== 步骤 5：结果确认与复制到剪贴板 ========== -->
   <section class="screen" data-screen="5">
     <div class="confirm-card" id="confirmCard"></div>
     <div class="footer">
-      <button class="btn mint" type="button" id="copyBtn" style="margin-bottom:12px;">复制结果发给 Ta</button>
-      <button class="btn ghost" type="button" data-back="4">返回修改</button>
+      <button class="btn mint btn-copy" type="button" id="copyBtn" style="margin-bottom:12px;">复制并发送给他 ♡</button>
+      <button class="btn ghost" type="button" data-back="4" id="backToEdit">返回修改</button>
     </div>
     <div class="status" id="statusBox"></div>
+    <div class="manual-box" id="manualBox">
+      <div class="mb-tip">长按下面的文字，全选后复制，再发给他就好啦～</div>
+      <textarea id="manualText" readonly></textarea>
+    </div>
   </section>
 
 </div>
@@ -384,7 +399,7 @@ var CONFIG = {
 
   /* ---------- 1. 称呼 ---------- */
   hostName:  "咕噜煲",          // 邀请人（你自己）的称呼，会出现在文案里
-  guestName: "小宝贝",          // 被邀请人（她）的称呼
+  guestName: "小三木",          // 被邀请人（她）的称呼
 
   /* ---------- 2. 开场文案 ---------- */
   inviteTitle: "有一件超重要的事\n想认真问问你",   // 开场大标题，\n 表示换行
@@ -404,14 +419,16 @@ var CONFIG = {
 
   /* ---------- 3. 时间选项 ---------- */
   // 单选（可改 multi:true 变多选）；末尾会自动追加「其他时间」自定义输入项
-  timeMulti: false,
+  timeMulti: true,
   timeTitle: "你想什么时候见面？",
   timeSub: "选一个你最方便的时间，我提前安排～",
   timeOptions: [
-    { key: "fri18",  name: "本周五 18:00", desc: "下班后小聚，吃完还能散步", icon: "calendar" },
-    { key: "sat12",  name: "本周六 12:00", desc: "悠闲午间，一整天都归我们", icon: "calendar" },
-    { key: "sat18",  name: "本周六 18:00", desc: "周末夜晚，灯火正好",     icon: "calendar" },
-    { key: "sun14",  name: "本周日 14:00", desc: "午后时光，慢悠悠",       icon: "calendar" }
+    { key: "mon", name: "周一", desc: "一周的开始，也想从见你开始", icon: "calendar" },
+    { key: "tue", name: "周二", desc: "平平淡淡的日子也想见你",     icon: "calendar" },
+    { key: "wed", name: "周三", desc: "周中偷个小懒出来玩",         icon: "calendar" },
+    { key: "thu", name: "周四", desc: "再熬一天就到周末啦",         icon: "calendar" },
+    { key: "fri", name: "周五", desc: "放学，一起走嘛",       icon: "calendar" },
+    { key: "sun", name: "周日", desc: "晚上偷偷溜出去呀",     icon: "calendar" }
   ],
 
   /* ---------- 4. 地点 / 项目选项 ---------- */
@@ -420,11 +437,8 @@ var CONFIG = {
   placeTitle: "想去哪里约会？",
   placeSub: "可以多选，想去的都勾上～",
   placeOptions: [
-    { key: "cafe",   name: "咖啡厅",  desc: "安静角落，慢慢聊天",   icon: "coffee" },
-    { key: "movie",  name: "电影院",  desc: "一起看场电影",         icon: "popcorn" },
-    { key: "park",   name: "公园散步", desc: "吹吹风，走走停停",     icon: "tree" },
-    { key: "mall",   name: "商场逛街", desc: "看看喜欢的，随便逛",   icon: "bag" },
-    { key: "funpark",name: "游乐场",  desc: "尖叫和笑声都归你",     icon: "ferris" }
+    { key: "river",  name: "河边",       desc: "❤️", icon: "river" },
+    { key: "school", name: "学校里闲逛", desc: "随便逛逛也好呀 狗粮到处撒",   icon: "school" }
   ],
 
   /* ---------- 5. 餐饮选项 ---------- */
@@ -441,19 +455,8 @@ var CONFIG = {
 
   /* ---------- 6. 留言 ---------- */
   noteTitle: "还有什么想告诉我？",
-  noteSub: "想说的话、想吃的、想玩的小心思，都可以写～",
 
-  /* ---------- 7. 结果提交地址（Formspree） ---------- */
-  // 想在自己的后台（邮箱）收到她的选择结果，就注册一个 Formspree 表单，把地址填在下面：
-  //   1) 打开 https://formspree.io 用邮箱免费注册
-  //   2) 点 "New Form"，起个名字（例如 Date Invitation）
-  //   3) 复制形如 https://formspree.io/f/abcdwxyz 的地址
-  //   4) 粘贴到下面引号里，保存并重新部署
-  // 留空（""）也能正常使用：会自动切换成「本地模式」，
-  //   结果保存在她的浏览器里，并引导她点「复制结果」直接发给你。
-  REPORT_ENDPOINT: "",
-
-  /* ---------- 8. 其他开关 ---------- */
+  /* ---------- 7. 其他开关 ---------- */
   requirePlace: true,   // 是否必须选地点才能下一步
   requireFood:  true,   // 是否必须选餐饮才能下一步
   pageTitle: "有一份小小的邀请"  // 顶部品牌小字
@@ -469,11 +472,8 @@ var ICONS = {
   heartSmall: '<svg viewBox="0 0 32 32" width="20" height="20" fill="none"><path d="M16 27S4 19.6 4 12.4A6.4 6.4 0 0 1 16 8.6 6.4 6.4 0 0 1 28 12.4C28 19.6 16 27 16 27Z" fill="#FFB6C8" stroke="#F5809A" stroke-width="1.7" stroke-linejoin="round"/></svg>',
   cat: '<svg viewBox="0 0 40 40" width="72" height="72"><path d="M11 12 8 5l7 3" fill="#FFD6E0" stroke="#F5809A" stroke-width="1.8" stroke-linejoin="round"/><path d="M29 12 32 5l-7 3" fill="#FFD6E0" stroke="#F5809A" stroke-width="1.8" stroke-linejoin="round"/><ellipse cx="20" cy="23" rx="11" ry="10" fill="#FFF3F7" stroke="#F5809A" stroke-width="1.8"/><circle cx="15.5" cy="22" r="1.6" fill="#5A4A52"/><circle cx="24.5" cy="22" r="1.6" fill="#5A4A52"/><path d="M18 26.5 20 28 22 26.5" fill="none" stroke="#5A4A52" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="25" r="2" fill="#FFD6E0" opacity=".85"/><circle cx="29" cy="25" r="2" fill="#FFD6E0" opacity=".85"/><path d="M4 22h4M4 25.5h4M32 22h4M32 25.5h4" stroke="#F5809A" stroke-width="1.3" stroke-linecap="round"/></svg>',
   calendar: '<svg viewBox="0 0 32 32" width="38" height="38"><rect x="4" y="7" width="24" height="21" rx="5" fill="#FFF6DC" stroke="#E8B84B" stroke-width="1.7"/><path d="M4 12h24" stroke="#E8B84B" stroke-width="1.7"/><rect x="4" y="7" width="24" height="6" rx="5" fill="#FFD166" stroke="#E8B84B" stroke-width="1.7"/><path d="M10.5 3.5v5M21.5 3.5v5" stroke="#E8B84B" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="18" r="1.7" fill="#FF9CB0"/><circle cx="16" cy="18" r="1.7" fill="#A9D6FF"/><circle cx="21" cy="18" r="1.7" fill="#9FE0C4"/><circle cx="11" cy="23.5" r="1.7" fill="#C9B6E4"/><circle cx="16" cy="23.5" r="1.7" fill="#FFC9A9"/></svg>',
-  coffee: '<svg viewBox="0 0 32 32" width="38" height="38"><path d="M7 12h16v9.5a5 5 0 0 1-5 5h-6a5 5 0 0 1-5-5z" fill="#FFF6EA" stroke="#B98A5A" stroke-width="1.7" stroke-linejoin="round"/><path d="M23 14.5h2.4a3.5 3.5 0 0 1 0 7H23" fill="none" stroke="#B98A5A" stroke-width="1.7" stroke-linecap="round"/><path d="M12 8.5c0-1.6 1.2-2.2 1.2-3.5M17.6 8.5c0-1.6 1.2-2.2 1.2-3.5" stroke="#C9B6E4" stroke-width="1.7" stroke-linecap="round" fill="none"/></svg>',
-  popcorn: '<svg viewBox="0 0 32 32" width="38" height="38"><path d="M8 14h16l-1.8 13.5H9.8z" fill="#FFE3EA" stroke="#F5809A" stroke-width="1.7" stroke-linejoin="round"/><path d="M6.5 14c.4-2.6 2-3.4 3.2-2.8.6-2.6 3-3.4 4.3-1.6.6-2.6 3.2-3.2 4.6-1.2.9-2.2 3.2-2 3.7.4.6-1.4 2.8-1 3 1.4z" fill="#FFF6DC" stroke="#E8B84B" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 18h8" stroke="#F5809A" stroke-width="1.5" stroke-linecap="round" stroke-dasharray="2 2.5"/></svg>',
-  tree: '<svg viewBox="0 0 32 32" width="38" height="38"><rect x="14.4" y="19" width="3.2" height="9" rx="1.4" fill="#C79A6B"/><circle cx="16" cy="13.5" r="9" fill="#BEEBCF" stroke="#7FC69B" stroke-width="1.7"/><circle cx="11.5" cy="16" r="4.3" fill="#D8F5E4"/><circle cx="20.8" cy="15" r="4.3" fill="#D8F5E4"/></svg>',
-  bag: '<svg viewBox="0 0 32 32" width="38" height="38"><path d="M7 11h18l-1.7 16.2a2 2 0 0 1-2 1.8H10.7a2 2 0 0 1-2-1.8z" fill="#E4F1FF" stroke="#6FA9E0" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 12V9a4 4 0 0 1 8 0v3" fill="none" stroke="#6FA9E0" stroke-width="1.7" stroke-linecap="round"/><circle cx="13" cy="17.5" r="1.4" fill="#6FA9E0"/><circle cx="19" cy="17.5" r="1.4" fill="#6FA9E0"/></svg>',
-  ferris: '<svg viewBox="0 0 32 32" width="38" height="38"><circle cx="16" cy="13.5" r="9" fill="none" stroke="#C9B6E4" stroke-width="2.1"/><circle cx="16" cy="13.5" r="2.2" fill="#FF9CB0"/><path d="M16 4.5v18M7 13.5h18M9.6 7.1l12.8 12.8M22.4 7.1 9.6 19.9" stroke="#C9B6E4" stroke-width="1.4"/><path d="M16 22.5v6M10.5 29h11" stroke="#C9B6E4" stroke-width="1.8" stroke-linecap="round"/></svg>',
+  river: '<svg viewBox="0 0 32 32" width="38" height="38"><path d="M4 14.5c1.5-3.4 4-5.2 7.2-5.2 2.9 0 5.1 1.4 6.6 3.4" fill="none" stroke="#7FC69B" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><circle cx="23.5" cy="7.8" r="3.1" fill="#FFD166" stroke="#E8B84B" stroke-width="1.5"/><path d="M3.5 20.2c2.4 0 2.4-1.7 4.8-1.7s2.4 1.7 4.8 1.7 2.4-1.7 4.8-1.7 2.4 1.7 4.8 1.7 2.4-1.7 4.8-1.7" fill="none" stroke="#6FA9E0" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 25.4c2.4 0 2.4-1.7 4.8-1.7s2.4 1.7 4.8 1.7 2.4-1.7 4.8-1.7 2.4 1.7 4.8 1.7 2.4-1.7 4.8-1.7" fill="none" stroke="#A9D6FF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  school: '<svg viewBox="0 0 32 32" width="38" height="38"><path d="M6 14.2 16 5.4l10 8.8v12.3a1.6 1.6 0 0 1-1.6 1.6H7.6A1.6 1.6 0 0 1 6 26.5z" fill="#FFF3E0" stroke="#E8A45B" stroke-width="1.7" stroke-linejoin="round"/><rect x="13" y="18.5" width="6" height="9.6" rx="1" fill="#E4D6F7" stroke="#9C86C4" stroke-width="1.4"/><rect x="8.6" y="15.6" width="4.1" height="4.1" rx="1" fill="#DCEEFF" stroke="#6FA9E0" stroke-width="1.3"/><rect x="19.3" y="15.6" width="4.1" height="4.1" rx="1" fill="#DCEEFF" stroke="#6FA9E0" stroke-width="1.3"/><path d="M16 5.4V2.6" stroke="#8B7A82" stroke-width="1.6" stroke-linecap="round"/><path d="M16.5 2.6h4.3l-1.3 1.7 1.3 1.7h-4.3z" fill="#FF9CB0" stroke="#F5809A" stroke-width="1.2" stroke-linejoin="round"/></svg>',
   hotpot: '<svg viewBox="0 0 32 32" width="38" height="38"><path d="M5 14.5h22V20a8 8 0 0 1-8 8h-6a8 8 0 0 1-8-8z" fill="#FFE3EA" stroke="#F5809A" stroke-width="1.7" stroke-linejoin="round"/><path d="M3 14.5h26" stroke="#F5809A" stroke-width="1.8" stroke-linecap="round"/><path d="M11 10.5c0-2 2-2 2-4M16 10.5c0-2 2-2 2-4M21 10.5c0-2 2-2 2-4" stroke="#C9B6E4" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
   sushi: '<svg viewBox="0 0 32 32" width="38" height="38"><rect x="5" y="15" width="22" height="10" rx="5" fill="#FFFFFF" stroke="#B98A5A" stroke-width="1.7"/><path d="M5.5 20.5h21" stroke="#7FC69B" stroke-width="2.4" stroke-linecap="round"/><rect x="5" y="10.5" width="22" height="5.5" rx="2.75" fill="#FFE0BC" stroke="#E8A45B" stroke-width="1.5"/><circle cx="16" cy="13.3" r="1.7" fill="#FF9CB0"/></svg>',
   steak: '<svg viewBox="0 0 32 32" width="38" height="38"><ellipse cx="16" cy="18" rx="12.5" ry="8" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1.6"/><path d="M10.5 16.5c1.6-3.2 6.4-4.2 9.6-2.6 2.6 1.3 3.3 4.2 1.6 6.1-1.9 2.1-7.1 2.6-10 1.2-2.2-1-2.4-2.8-1.2-4.7z" fill="#E38A6C" stroke="#C96B4E" stroke-width="1.6" stroke-linejoin="round"/><path d="M13.5 16.8c2-.9 4.6-.9 6.4 0" stroke="#F6C6B4" stroke-width="1.6" stroke-linecap="round" fill="none"/></svg>',
@@ -509,9 +509,7 @@ var state = {
   placeCustom: "",
   foods: [],
   foodCustom: "",
-  note: "",
-  submitted: false,
-  submitState: "idle"  // idle | loading | ok | err | local
+  note: ""
 };
 
 /* =========================================================================
@@ -542,7 +540,7 @@ function init(){
   $("#t1text").textContent = CONFIG.timeTitle;
   $("#s1text").textContent = CONFIG.timeSub;
 
-  $("#t2").innerHTML = ICONS.tree;
+  $("#t2").innerHTML = ICONS.river;
   $("#t2text").textContent = CONFIG.placeTitle;
   $("#s2text").textContent = CONFIG.placeSub;
 
@@ -582,7 +580,7 @@ function renderList(containerId, options, type, multi){
   // 自定义输入项
   html += '<div class="opt custom-input" data-type="' + type + '" data-key="__custom__">'
         +   '<div class="ic">' + ICONS.edit + '</div>'
-        +   '<div class="txt"><div class="name">其他（自己填）</div><div class="desc">想选别的就写在这里</div></div>'
+        +   '<div class="txt"><div class="name">其他</div><div class="desc">实际上吃个嘴子也行嘛。。。</div></div>'
         +   '<div class="tick">' + ICONS.check + '</div>'
         + '</div>';
   box.innerHTML = html;
@@ -659,11 +657,16 @@ function bindEvents(){
   $("#foodCustomInput").addEventListener("input", function(){ state.foodCustom = this.value; });
   $("#noteInput").addEventListener("input", function(){ state.note = this.value; });
 
-  // ---- 提交 ----
-  $("#doSubmit").addEventListener("click", doSubmit);
+  // ---- 进入确认页（在确认页上整理文案并复制发送） ----
+  $("#toStep5").addEventListener("click", function(){
+    if (!validateTime()){ goStep(1); return; }
+    if (!validatePlace()){ goStep(2); return; }
+    if (CONFIG.requireFood && state.foods.length === 0 && !state.foodCustom.trim()){ goStep(3); return; }
+    goStep(5);
+  });
 
-  // ---- 复制结果 ----
-  $("#copyBtn").addEventListener("click", copyResult);
+  // ---- 确认页：复制到剪贴板 ----
+  $("#copyBtn").addEventListener("click", doCopy);
 }
 
 /* 处理选项点击 */
@@ -756,11 +759,13 @@ function findOption(list, key){
  *  步骤切换与校验
  * ========================================================================= */
 function goStep(n){
-  if (n === 5 && !state.submitted){
-    // 进入确认页前，先确保数据已提交
-    return;
+  if (n === 5){
+    // 每次进入确认页都重新渲染，并清空上一次的复制提示
+    var st = $("#statusBox");
+    if (st) st.className = "status";
+    hideManualBox();
+    renderConfirm(false);
   }
-  if (n === 5) renderConfirm();
 
   state.step = n;
 
@@ -834,99 +839,109 @@ function collectResult(){
     places: places,
     foods: foods,
     note: state.note.trim(),
-    submittedAt: submitTime,
-    pageUrl: location.href
+    submittedAt: submitTime
   };
 }
 
-/* 生成可复制的纯文本 */
-function buildCopyText(r){
+/* =========================================================================
+ *  复制到剪贴板（纯前端，无任何上报 / 存储）
+ *  优先级：① navigator.clipboard.writeText
+ *          ② 隐藏 textarea + document.execCommand("copy")（兼容微信内置浏览器 / iOS 旧内核）
+ *          ③ 展示可长按全选的文本框，提示她手动长按复制
+ * ========================================================================= */
+function buildMessage(){
+  var r = collectResult();
+
   var lines = [];
-  lines.push("【约会邀请 · 确认单】");
-  lines.push("被邀请人：" + r.guestName);
-  lines.push("时间：" + (r.time || "（未选择）"));
-  lines.push("地点：" + (r.places.length ? r.places.join("、") : "（未选择）"));
-  lines.push("吃什么：" + (r.foods.length ? r.foods.join("、") : "（未选择）"));
-  lines.push("留言：" + (r.note ? r.note : "（无）"));
-  lines.push("提交时间：" + r.submittedAt);
+  lines.push("我答应你啦～♡");
+  lines.push("");
+  lines.push("时间：" + (r.time || "待定"));
+  lines.push("地点：" + (r.places.length ? r.places.join("、") : "待定"));
+  lines.push("吃什么：" + (r.foods.length ? r.foods.join("、") : "待定"));
+  if (r.note) lines.push("想对你说：" + r.note);
+  lines.push("");
+  lines.push("—— " + r.guestName + " 回给 " + r.hostName);
+  lines.push("（" + r.submittedAt + "）");
   return lines.join("\n");
 }
 
-/* =========================================================================
- *  提交逻辑
- * ========================================================================= */
-function doSubmit(){
-  // 最后再校验一次
+function doCopy(){
+  // 复制前再确认一次信息完整
   if (!validateTime()){ goStep(1); return; }
   if (!validatePlace()){ goStep(2); return; }
   if (CONFIG.requireFood && state.foods.length === 0 && !state.foodCustom.trim()){ goStep(3); return; }
 
-  var result = collectResult();
+  var msg = buildMessage();
 
-  // 无论是否联网，都先本地保存一份（兜底）
-  saveLocal(result);
-
-  var endpoint = (CONFIG.REPORT_ENDPOINT || "").trim();
-
-  if (!endpoint){
-    // 未配置上报地址 → 纯本地模式
-    state.submitted = true;
-    state.submitState = "local";
-    goStep(5);
-    showStatus("ok",
-      "已记录你的选择啦！\n请点下面的「复制结果发给 Ta」按钮，把结果粘贴发给他～");
-    return;
-  }
-
-  // 配置了地址 → POST 提交
-  setSubmitLoading(true);
-  var payload = {
-    _subject: "💕 收到一份约会邀请确认：" + result.guestName,
-    guestName: result.guestName,
-    hostName: result.hostName,
-    time: result.time,
-    places: result.places.join("、"),
-    foods: result.foods.join("、"),
-    note: result.note,
-    submittedAt: result.submittedAt,
-    pageUrl: result.pageUrl
-  };
-
-  fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "Accept": "application/json" },
-    body: JSON.stringify(payload)
-  }).then(function(res){
-    setSubmitLoading(false);
-    state.submitted = true;
-    if (res.ok){
-      state.submitState = "ok";
-      goStep(5);
-      showStatus("ok", "提交成功！你的选择已经飞到他那儿啦～\n（也可以点「复制结果」再发他一份，更保险）");
+  copyText(msg, function(ok){
+    renderConfirm(ok);
+    var btn = $("#copyBtn");
+    if (ok){
+      if (btn){ btn.classList.add("copied"); btn.textContent = "已复制 ✓"; }
+      hideManualBox();
+      showStatus("ok", "已复制！粘贴到微信发给他就行～");
     } else {
-      state.submitState = "err";
-      goStep(5);
-      showStatus("err", "网络有点小情绪，提交没成功。\n别担心，点下面的「复制结果发给 Ta」，把结果直接发给他就好～");
+      if (btn){ btn.classList.remove("copied"); btn.textContent = "复制并发送给他 ♡"; }
+      showStatus("info", "没能自动复制，长按下面的文字全选复制就好～");
+      showManualBox(msg);
     }
-  }).catch(function(){
-    setSubmitLoading(false);
-    state.submitted = true;
-    state.submitState = "err";
-    goStep(5);
-    showStatus("err", "网络连接失败，提交没成功。\n没关系，点「复制结果发给 Ta」，把结果发给他一样可以～");
   });
 }
 
-function setSubmitLoading(loading){
-  var btn = $("#doSubmit");
-  if (!btn) return;
-  if (loading){
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spinner"></span>正在提交…';
-  } else {
-    btn.disabled = false;
-    btn.textContent = "提交给她一个惊喜";
+/* 复制：优先现代 API，失败降级 execCommand，再失败交给手动兜底框 */
+function copyText(text, done){
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    try {
+      navigator.clipboard.writeText(text).then(function(){
+        done(true);
+      }).catch(function(){
+        done(legacyCopy(text));
+      });
+      return;
+    } catch(e){ /* 少数内核会同步抛错，继续走降级方案 */ }
   }
+  done(legacyCopy(text));
+}
+
+/* 兼容微信内置浏览器 / iOS 的隐藏 textarea 方案 */
+function legacyCopy(text){
+  var ta = null;
+  try {
+    ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "readonly");
+    ta.style.position = "fixed";
+    ta.style.top = "0";
+    ta.style.left = "-9999px";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+
+    ta.focus();
+    ta.select();
+    if (ta.setSelectionRange) ta.setSelectionRange(0, ta.value.length);
+
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch(e){ ok = false; }
+
+    if (ta.parentNode) ta.parentNode.removeChild(ta);
+    return ok;
+  } catch(e){
+    if (ta && ta.parentNode) ta.parentNode.removeChild(ta);
+    return false;
+  }
+}
+
+/* 自动复制失败时，把文案放进可长按全选的显示框 */
+function showManualBox(msg){
+  var box = $("#manualBox");
+  var ta = $("#manualText");
+  if (!box || !ta) return;
+  ta.value = msg;
+  box.classList.add("show");
+}
+function hideManualBox(){
+  var box = $("#manualBox");
+  if (box) box.classList.remove("show");
 }
 
 function showStatus(type, msg){
@@ -936,24 +951,10 @@ function showStatus(type, msg){
   box.textContent = msg;
 }
 
-/* 本地兜底：写入 localStorage（保留最近 20 条） */
-function saveLocal(result){
-  try {
-    var key = "dateInvitationRecords";
-    var list = [];
-    var raw = localStorage.getItem(key);
-    if (raw){ try { list = JSON.parse(raw) || []; } catch(e){ list = []; } }
-    list.push(result);
-    if (list.length > 20) list = list.slice(list.length - 20);
-    localStorage.setItem(key, JSON.stringify(list));
-    localStorage.setItem("dateInvitationLast", JSON.stringify(result));
-  } catch(e){ /* 隐私模式下 localStorage 可能不可用，忽略即可 */ }
-}
-
 /* =========================================================================
  *  渲染确认卡
  * ========================================================================= */
-function renderConfirm(){
+function renderConfirm(copied){
   var r = collectResult();
 
   function tags(arr, emptyText){
@@ -963,55 +964,25 @@ function renderConfirm(){
     return s;
   }
 
+  var head = copied
+    ? '<div class="confirm-head"><div class="ct">复制好啦 ♡</div>'
+      + '<div class="cs">' + escapeHtml(CONFIG.hostName) + ' × ' + escapeHtml(CONFIG.guestName) + ' · 粘贴到微信发给他就行～</div></div>'
+    : '<div class="confirm-head"><div class="ct">约会确认卡</div>'
+      + '<div class="cs">' + escapeHtml(CONFIG.hostName) + ' × ' + escapeHtml(CONFIG.guestName) + ' · 核对一下，复制发给他吧</div></div>';
+
   var html = ''
-    + '<div class="confirm-head">'
-    +   '<div class="ct">约会确认卡</div>'
-    +   '<div class="cs">' + escapeHtml(CONFIG.hostName) + ' × ' + escapeHtml(CONFIG.guestName) + ' · 正式生效</div>'
-    + '</div>'
+    + head
     + '<div class="confirm-body">'
     +   '<div class="crow"><div class="ck">时间</div><div class="cv">' + (r.time ? escapeHtml(r.time) : '<span style="color:#B9AEB5;">待定</span>') + '</div></div>'
     +   '<div class="crow"><div class="ck">地点</div><div class="cv">' + tags(r.places, "待定") + '</div></div>'
     +   '<div class="crow"><div class="ck">吃什么</div><div class="cv">' + tags(r.foods, "待定") + '</div></div>'
     +   '<div class="crow"><div class="ck">留言</div><div class="cv">' + (r.note ? escapeHtml(r.note) : '<span style="color:#B9AEB5;">（还没有留言）</span>') + '</div></div>'
     +   '<div class="celebrate"><span>' + ICONS.heartSmall + '</span><span>' + ICONS.heartSmall + '</span><span>' + ICONS.heartSmall + '</span></div>'
-    +   '<div class="stamp">提交时间 ' + escapeHtml(r.submittedAt) + '</div>'
+    +   '<div class="stamp">生成时间 ' + escapeHtml(r.submittedAt) + '</div>'
     +   '<div class="sign">—— 就等这一天啦 ♡</div>'
     + '</div>';
 
   $("#confirmCard").innerHTML = html;
-}
-
-/* =========================================================================
- *  复制结果
- * ========================================================================= */
-function copyResult(){
-  var r = collectResult();
-  var text = buildCopyText(r);
-
-  function done(){
-    showStatus("ok", "已复制！把内容粘贴到聊天框发给他就行啦～");
-  }
-  function fail(){
-    // 降级：弹出可手动选择复制的输入框
-    var ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.left = "-9999px";
-    document.body.appendChild(ta);
-    ta.select();
-    ta.setSelectionRange(0, text.length);
-    var ok = false;
-    try { ok = document.execCommand("copy"); } catch(e){ ok = false; }
-    document.body.removeChild(ta);
-    if (ok){ done(); }
-    else { showStatus("err", "复制失败，请长按下面的文字手动复制：\n" + text); }
-  }
-
-  if (navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(text).then(done).catch(fail);
-  } else {
-    fail();
-  }
 }
 
 /* 启动 */
