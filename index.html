@@ -164,20 +164,6 @@ body{
 .opt.sel .tick{background:var(--pink);border-color:var(--pink);}
 .opt.sel .tick svg{opacity:1;transform:scale(1);}
 
-/* 只开放当天：其余日期置灰 + 取消点击响应 */
-.opt.disabled{
-  opacity:.45;
-  filter:grayscale(1);
-  background:#F8F5F7;
-  border-color:#ECE5EA;
-  box-shadow:none;
-  cursor:not-allowed;
-  pointer-events:none;
-}
-.opt.disabled:active{transform:none;}
-.opt.disabled .name,.opt.disabled .desc{color:#B9AEB5;}
-.opt.disabled .tick{border-color:#E4DCE1;background:#F1ECEF;}
-
 /* 自定义输入 */
 .opt.custom-input{border-style:dashed;border-color:#E3D6E0;}
 .opt.custom-input.sel{border-style:solid;border-color:var(--pink);}
@@ -513,57 +499,6 @@ function $(sel){ return document.querySelector(sel); }
 function $all(sel){ return Array.prototype.slice.call(document.querySelectorAll(sel)); }
 
 /* =========================================================================
- *  「只开放当天」——按设备当前日期动态锁定时间选项
- *  （不硬编码任何日期，明天打开会自动切换成新的当天）
- * ========================================================================= */
-var WEEK_KEYS = ["sun","mon","tue","wed","thu","fri","sat"];   // 与 Date.getDay() 对应，0 = 周日
-var WEEK_CN   = { sun:"周日", mon:"周一", tue:"周二", wed:"周三", thu:"周四", fri:"周五", sat:"周六" };
-
-// 运行时取设备当前日期，返回当天的星期 key
-function getTodayKey(){
-  return WEEK_KEYS[new Date().getDay()];
-}
-
-// 若时间选项里没有当天（例如配置里本来没有周六），自动补一条，保证永远有且只有当天可选
-function ensureTodayTimeOption(todayKey){
-  if (!findOption(CONFIG.timeOptions, todayKey)){
-    CONFIG.timeOptions = [{
-      key: todayKey,
-      name: WEEK_CN[todayKey],
-      icon: "calendar"
-    }].concat(CONFIG.timeOptions);
-  }
-  return todayKey;
-}
-
-// 锁定时间列表：只留当天可点并默认选中，其余（含「其他」自定义项）置灰且不可选中
-function applyTodayOnlyTimeLock(){
-  var todayKey = ensureTodayTimeOption(getTodayKey());
-  var todayEl = null;
-
-  $all("#timeList .opt").forEach(function(el){
-    if (el.getAttribute("data-key") === todayKey){
-      todayEl = el;
-      el.classList.add("sel");
-      el.removeAttribute("aria-disabled");
-      return;
-    }
-    el.classList.add("disabled");
-    el.classList.remove("sel");
-    el.setAttribute("aria-disabled", "true");
-  });
-
-  if (!todayEl) return;
-
-  state.time = todayKey;
-  state.timeCustom = "";
-  var cf = $("#timeCustomField");
-  if (cf) cf.classList.remove("show");
-  var ci = $("#timeCustomInput");
-  if (ci) ci.value = "";
-}
-
-/* =========================================================================
  *  运行状态
  * ========================================================================= */
 var state = {
@@ -617,16 +552,10 @@ function init(){
   $("#t4text").textContent = CONFIG.noteTitle;
   $("#s4text").textContent = CONFIG.noteSub;
 
-  // 时间：先确保当天这条选项一定存在（按设备当前日期动态计算）
-  ensureTodayTimeOption(getTodayKey());
-
   // 渲染选项列表
   renderList("timeList", CONFIG.timeOptions, "time", CONFIG.timeMulti);
   renderList("placeList", CONFIG.placeOptions, "place", CONFIG.placeMulti);
   renderList("foodList", CONFIG.foodOptions, "food", CONFIG.foodMulti);
-
-  // 时间：只开放当天，其余日期置灰锁定
-  applyTodayOnlyTimeLock();
 
   // 事件绑定
   bindEvents();
@@ -742,9 +671,6 @@ function bindEvents(){
 
 /* 处理选项点击 */
 function handleOption(opt){
-  // 被置灰锁定的日期/选项：点击无任何响应
-  if (!opt || opt.classList.contains("disabled")) return;
-
   var type = opt.getAttribute("data-type");
   var key  = opt.getAttribute("data-key");
   var isCustom = (key === "__custom__");
@@ -768,12 +694,7 @@ function handleOption(opt){
         state.timeCustom = "";
       } else {
         opt.classList.toggle("sel");
-        // 当天是唯一可选日期，不允许被取消选中
-        if (!opt.classList.contains("sel") && key === getTodayKey()){
-          opt.classList.add("sel");
-        }
         if (!opt.classList.contains("sel")) state.time = null;
-        else state.time = key;
       }
     }
     return;
