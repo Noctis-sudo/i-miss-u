@@ -264,6 +264,46 @@ textarea:focus{border-color:var(--pink);}
 @keyframes popHeart{from{transform:translateY(0) scale(.9);}to{transform:translateY(-8px) scale(1.1);}}
 
 .hidden{display:none !important;}
+
+/* =========================================================
+   桌宠：固定在屏幕最底部的小图（点击穿透，不影响页面交互）
+   动效 = 整体轻浮动 + 左右微摆，起止同帧，无缝循环
+   ========================================================= */
+.pet{
+  position:fixed;
+  left:auto;
+  right:8px;
+  right:max(8px, env(safe-area-inset-right, 0px));
+  bottom:0px;
+  bottom:calc(0px + env(safe-area-inset-bottom, 0px));
+  width:min(110px, 18vw);
+  z-index:5;
+  pointer-events:none;
+  -webkit-user-select:none;user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  transform:translateZ(0);
+}
+.pet img{
+  display:block;
+  width:100%;
+  height:auto;
+  pointer-events:none;
+  transform-origin:50% 100%;
+  animation:petFloat 4.8s ease-in-out infinite;
+  -webkit-backface-visibility:hidden;
+  backface-visibility:hidden;
+}
+@keyframes petFloat{
+  0%  {transform:translate3d(0,0,0) rotate(0deg) scale(1);}
+  25% {transform:translate3d(-3px,-5px,0) rotate(-2.2deg) scale(1.01);}
+  50% {transform:translate3d(0,-9px,0) rotate(0deg) scale(1.02);}
+  75% {transform:translate3d(3px,-5px,0) rotate(2.2deg) scale(1.01);}
+  100%{transform:translate3d(0,0,0) rotate(0deg) scale(1);}
+}
+/* 用户系统偏好「减少动态效果」时保持静止，仅不做动画 */
+@media (prefers-reduced-motion: reduce){
+  .pet img{animation:none;}
+}
 </style>
 </head>
 <body>
@@ -988,5 +1028,10 @@ function renderConfirm(copied){
 /* 启动 */
 init();
 </script>
+
+<!-- 桌宠：固定在屏幕最下方的小图（pointer-events:none，点击穿透不挡按钮） -->
+<div class="pet" id="petBox" aria-hidden="true">
+  <img id="petImg" src="moJep.png" alt="" draggable="false">
+</div>
 </body>
 </html>
